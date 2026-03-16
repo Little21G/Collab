@@ -163,5 +163,22 @@ public class InfraredCamera : MonoBehaviour
         screenRect.localScale = new Vector3(1, 0, 1);
         infraredScreenUI.SetActive(false);
         thermalCameraObject.SetActive(false);
+    }// --- BATTERY SYSTEM ---
+
+    // The battery pickup will call this method when you interact with it!
+    public void AddPower(float amount)
+    {
+        currentBattery += amount;
+        
+        // Make sure we don't overcharge past 100%
+        currentBattery = Mathf.Clamp(currentBattery, 0, maxBattery);
+
+        // Instantly update the UI slider so the player sees the jump
+        if (batteryBar != null)
+        {
+            batteryBar.value = currentBattery;
+        }
+
+        Debug.Log($"Infrared Camera charged! Current battery is now: {currentBattery}/{maxBattery}");
     }
 }
