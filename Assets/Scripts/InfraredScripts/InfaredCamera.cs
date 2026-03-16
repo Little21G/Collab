@@ -1,6 +1,7 @@
-using System.Collections; // We need this to use Coroutines (animations over time)
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI; 
 
 public class InfraredCamera : MonoBehaviour
 {
@@ -12,15 +13,27 @@ public class InfraredCamera : MonoBehaviour
     public GameObject thermalCameraObject; 
 
     [Header("Animation Settings")]
-    public float transitionSpeed = 0.15f; // How fast the TV turns on/off (in seconds)
+    public float transitionSpeed = 0.15f; 
+
+    [Header("Battery System")]
+    public float maxBattery = 100f;
+    public Slider batteryBar; 
+    private float currentBattery;
 
     private bool isCameraActive = false; 
-    private RectTransform screenRect; // The UI component that controls the screen's size
-    private Coroutine currentAnimation; // Keeps track of the animation so it doesn't glitch
+    private RectTransform screenRect; 
+    private Coroutine currentAnimation; 
 
     void Start()
     {
-        // Grab the RectTransform from your UI screen so we can change its scale
+        currentBattery = maxBattery;
+        if (batteryBar != null)
+        {
+            batteryBar.maxValue = maxBattery;
+            batteryBar.value = currentBattery;
+            batteryBar.gameObject.SetActive(false); 
+        }
+
         if (infraredScreenUI != null)
         {
             screenRect = infraredScreenUI.GetComponent<RectTransform>();
@@ -44,7 +57,30 @@ public class InfraredCamera : MonoBehaviour
     {
         if (toggleAction.WasPressedThisFrame())
         {
-            ToggleInfrared();
+            if (!isCameraActive && currentBattery > 0)
+            {
+                ToggleInfrared();
+            }
+            else if (isCameraActive)
+            {
+                ToggleInfrared();
+            }
+        }
+
+        if (isCameraActive)
+        {
+            currentBattery -= (1f / 2f) * Time.deltaTime; 
+            currentBattery = Mathf.Clamp(currentBattery, 0, maxBattery);
+
+            if (batteryBar != null)
+            {
+                batteryBar.value = currentBattery;
+            }
+
+            if (currentBattery <= 0)
+            {
+                ToggleInfrared();
+            }
         }
     }
 
@@ -52,13 +88,11 @@ public class InfraredCamera : MonoBehaviour
     {
         isCameraActive = !isCameraActive;
 
-        // If you spam the 'F' key, this stops the previous animation so they don't fight
         if (currentAnimation != null) 
         {
             StopCoroutine(currentAnimation);
         }
 
-        // Start the correct animation based on whether the camera is now on or off
         if (isCameraActive)
         {
             currentAnimation = StartCoroutine(TurnOnTV());
@@ -69,51 +103,64 @@ public class InfraredCamera : MonoBehaviour
         }
     }
 
-    // --- OUR ANIMATIONS ---
+    // --- ANIMATIONS ---
 
     IEnumerator TurnOnTV()
     {
-        // 1. Turn the camera and UI object ON immediately
         thermalCameraObject.SetActive(true);
         infraredScreenUI.SetActive(true);
         
-        float timeElapsed = 0;
+        // We removed the instant battery turn-on from here!
         
-        // 2. Smash the screen completely flat on the Y axis (so it looks like a thin horizontal line)
+        float timeElapsed = 0;
         screenRect.localScale = new Vector3(1, 0, 1);
 
-        // 3. Smoothly grow the Y scale from 0 to 1 over our transitionSpeed
+        // 1. Wait for the screen to stretch open first
         while (timeElapsed < transitionSpeed)
         {
-            // Mathf.Lerp smoothly blends between two numbers
             float newY = Mathf.Lerp(0, 1, timeElapsed / transitionSpeed);
             screenRect.localScale = new Vector3(1, newY, 1);
-            
             timeElapsed += Time.deltaTime;
-            yield return null; // This tells Unity "Pause here and finish the rest next frame"
+            yield return null; 
         }
 
-        // 4. Force it to exactly 1 at the end just to be safe
         screenRect.localScale = new Vector3(1, 1, 1);
+
+        // 2. The Flicker Sequence!
+        if (batteryBar != null)
+        {
+            batteryBar.gameObject.SetActive(true);
+            yield return new WaitForSeconds(0.05f); // Flash ON
+            
+            batteryBar.gameObject.SetActive(false);
+            yield return new WaitForSeconds(0.05f); // Flash OFF
+            
+            batteryBar.gameObject.SetActive(true);
+            yield return new WaitForSeconds(0.08f); // Flash ON slightly longer
+            
+            batteryBar.gameObject.SetActive(false);
+            yield return new WaitForSeconds(0.05f); // Flash OFF
+            
+            batteryBar.gameObject.SetActive(true);  // Finally stays ON
+        }
     }
 
     IEnumerator TurnOffTV()
     {
+        // Hide the battery immediately before the screen crushes down
+        if (batteryBar != null) batteryBar.gameObject.SetActive(false);
+
         float timeElapsed = 0;
 
-        // 1. Smoothly shrink the Y scale from 1 down to 0
         while (timeElapsed < transitionSpeed)
         {
             float newY = Mathf.Lerp(1, 0, timeElapsed / transitionSpeed);
             screenRect.localScale = new Vector3(1, newY, 1);
-            
             timeElapsed += Time.deltaTime;
             yield return null;
         }
 
         screenRect.localScale = new Vector3(1, 0, 1);
-        
-        // 2. Turn the actual objects OFF now that the screen is completely crushed
         infraredScreenUI.SetActive(false);
         thermalCameraObject.SetActive(false);
     }
