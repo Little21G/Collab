@@ -1,27 +1,22 @@
 using UnityEngine;
 
-// Remember, this requires the IInteractable interface we made earlier!
 public class BatteryPickup : MonoBehaviour, IInteractable
 {
     [Header("Battery Settings")]
-    public float powerAmount = 25f; // How much juice this battery gives
+    public float powerAmount = 25f; // How much power this battery gives
 
     public void Interact()
     {
-        // 1. Look for YOUR InfraredCamera script in the scene
-        InfraredCamera infraCam = FindObjectOfType<InfraredCamera>();
+        // 1. Find the player's camera script in the scene
+        InfraredCamera cameraScript = Object.FindFirstObjectByType<InfraredCamera>();
 
-        // 2. If we found it, give it the power!
-        if (infraCam != null)
+        // 2. If we found it, send power to it!
+        if (cameraScript != null)
         {
-            infraCam.AddPower(powerAmount);
-            
-            // 3. Destroy the battery so it disappears from the world
-            Destroy(gameObject);
+            cameraScript.AddPower(powerAmount);
         }
-        else
-        {
-            Debug.LogWarning("You picked up a battery, but couldn't find the InfraredCamera script!");
-        }
+
+        // 3. Destroy the battery object so it disappears from the world
+        Destroy(gameObject);
     }
 }

@@ -11,6 +11,7 @@ public class InfraredCamera : MonoBehaviour
     [Header("Camera Objects")]
     public GameObject infraredScreenUI; 
     public GameObject thermalCameraObject; 
+    public GameObject greenCameraObject; 
 
     [Header("Animation Settings")]
     public float transitionSpeed = 0.15f; 
@@ -20,7 +21,7 @@ public class InfraredCamera : MonoBehaviour
     public Slider batteryBar; 
     private float currentBattery;
 
-    private bool isCameraActive = false; 
+    public bool isCameraActive = false; 
     private RectTransform screenRect; 
     private Coroutine currentAnimation; 
 
@@ -41,81 +42,72 @@ public class InfraredCamera : MonoBehaviour
         }
         
         if (thermalCameraObject != null) thermalCameraObject.SetActive(false);
+        if (greenCameraObject != null) greenCameraObject.SetActive(false);
     }
 
-    void OnEnable()
-    {
-        toggleAction.Enable();
-    }
-
-    void OnDisable()
-    {
-        toggleAction.Disable();
-    }
+    void OnEnable() { toggleAction.Enable(); }
+    void OnDisable() { toggleAction.Disable(); }
 
     void Update()
     {
         if (toggleAction.WasPressedThisFrame())
         {
-            if (!isCameraActive && currentBattery > 0)
-            {
-                ToggleInfrared();
-            }
-            else if (isCameraActive)
-            {
-                ToggleInfrared();
-            }
+            if (!isCameraActive && currentBattery > 0) ToggleInfrared();
+            else if (isCameraActive) ToggleInfrared();
         }
 
         if (isCameraActive)
         {
+            // Drain battery while on
             currentBattery -= (1f / 2f) * Time.deltaTime; 
             currentBattery = Mathf.Clamp(currentBattery, 0, maxBattery);
 
-            if (batteryBar != null)
-            {
-                batteryBar.value = currentBattery;
-            }
+            if (batteryBar != null) batteryBar.value = currentBattery;
 
-            if (currentBattery <= 0)
-            {
-                ToggleInfrared();
-            }
+            if (currentBattery <= 0) ToggleInfrared();
         }
     }
 
     void ToggleInfrared()
     {
         isCameraActive = !isCameraActive;
+        if (currentAnimation != null) StopCoroutine(currentAnimation);
 
-        if (currentAnimation != null) 
-        {
-            StopCoroutine(currentAnimation);
-        }
+        if (isCameraActive) currentAnimation = StartCoroutine(TurnOnTV());
+        else currentAnimation = StartCoroutine(TurnOffTV());
+    }
 
-        if (isCameraActive)
+    // ==========================================
+    // NEW FUNCTION: ADD POWER
+    // ==========================================
+    public void AddPower(float amountToAdd)
+    {
+        // Add the power
+        currentBattery += amountToAdd;
+        
+        // Make sure it doesn't go over 100 (maxBattery)
+        currentBattery = Mathf.Clamp(currentBattery, 0, maxBattery);
+        
+        // Update the UI slider immediately
+        if (batteryBar != null)
         {
-            currentAnimation = StartCoroutine(TurnOnTV());
+            batteryBar.value = currentBattery;
         }
-        else
-        {
-            currentAnimation = StartCoroutine(TurnOffTV());
-        }
+        
+        Debug.Log("Battery Recharged! Current power: " + currentBattery);
     }
 
     // --- ANIMATIONS ---
-
     IEnumerator TurnOnTV()
     {
         thermalCameraObject.SetActive(true);
-        infraredScreenUI.SetActive(true);
+        if (greenCameraObject != null) greenCameraObject.SetActive(true); 
         
-        // We removed the instant battery turn-on from here!
+        infraredScreenUI.SetActive(true);
         
         float timeElapsed = 0;
         screenRect.localScale = new Vector3(1, 0, 1);
 
-        // 1. Wait for the screen to stretch open first
         while (timeElapsed < transitionSpeed)
         {
             float newY = Mathf.Lerp(0, 1, timeElapsed / transitionSpeed);
@@ -126,32 +118,25 @@ public class InfraredCamera : MonoBehaviour
 
         screenRect.localScale = new Vector3(1, 1, 1);
 
-        // 2. The Flicker Sequence!
         if (batteryBar != null)
         {
             batteryBar.gameObject.SetActive(true);
-            yield return new WaitForSeconds(0.05f); // Flash ON
-            
+            yield return new WaitForSeconds(0.05f); 
             batteryBar.gameObject.SetActive(false);
-            yield return new WaitForSeconds(0.05f); // Flash OFF
-            
+            yield return new WaitForSeconds(0.05f); 
             batteryBar.gameObject.SetActive(true);
-            yield return new WaitForSeconds(0.08f); // Flash ON slightly longer
-            
+            yield return new WaitForSeconds(0.08f); 
             batteryBar.gameObject.SetActive(false);
-            yield return new WaitForSeconds(0.05f); // Flash OFF
-            
-            batteryBar.gameObject.SetActive(true);  // Finally stays ON
+            yield return new WaitForSeconds(0.05f); 
+            batteryBar.gameObject.SetActive(true);  
         }
     }
 
     IEnumerator TurnOffTV()
     {
-        // Hide the battery immediately before the screen crushes down
         if (batteryBar != null) batteryBar.gameObject.SetActive(false);
 
         float timeElapsed = 0;
-
         while (timeElapsed < transitionSpeed)
         {
             float newY = Mathf.Lerp(1, 0, timeElapsed / transitionSpeed);
@@ -163,22 +148,6 @@ public class InfraredCamera : MonoBehaviour
         screenRect.localScale = new Vector3(1, 0, 1);
         infraredScreenUI.SetActive(false);
         thermalCameraObject.SetActive(false);
-    }// --- BATTERY SYSTEM ---
-
-    // The battery pickup will call this method when you interact with it!
-    public void AddPower(float amount)
-    {
-        currentBattery += amount;
-        
-        // Make sure we don't overcharge past 100%
-        currentBattery = Mathf.Clamp(currentBattery, 0, maxBattery);
-
-        // Instantly update the UI slider so the player sees the jump
-        if (batteryBar != null)
-        {
-            batteryBar.value = currentBattery;
-        }
-
-        Debug.Log($"Infrared Camera charged! Current battery is now: {currentBattery}/{maxBattery}");
+        if (greenCameraObject != null) greenCameraObject.SetActive(false); 
     }
 }

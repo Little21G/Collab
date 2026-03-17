@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UI; // We need this line to talk to UI Images!
+using UnityEngine.UI; // Required for the Crosshair Image
 
 public class PlayerInteract : MonoBehaviour
 {
@@ -8,16 +8,26 @@ public class PlayerInteract : MonoBehaviour
     public Camera playerCamera; 
     public float interactDistance = 3f; 
     
-    [Header("Crosshair UI")]
+    [Header("UI Settings")]
     public Image crosshair; 
     public Color normalColor = Color.white;
     public Color interactColor = Color.green; // Color it changes to when aiming at an item
+    public GameObject interactText; // The "Press [E] to Pick Up" text object
 
     [Header("Input")]
     public InputAction interactAction; 
 
     // This stores whatever we are currently looking at
     private IInteractable currentInteractable;
+
+    void Start()
+    {
+        // Make sure the text prompt is hidden when the game starts
+        if (interactText != null)
+        {
+            interactText.SetActive(false);
+        }
+    }
 
     void OnEnable()
     {
@@ -43,31 +53,42 @@ public class PlayerInteract : MonoBehaviour
 
     void CheckForInteractables()
     {
-        // Shoot the laser from the center of the screen
+        // Shoot the invisible laser from the center of the screen
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
         RaycastHit hitInfo;
 
+        // Did the laser hit something within range?
         if (Physics.Raycast(ray, out hitInfo, interactDistance))
         {
-            // Did we hit something with the IInteractable interface?
+            // Try to get the IInteractable component from what we hit
             IInteractable interactableObject = hitInfo.collider.GetComponent<IInteractable>();
             
             if (interactableObject != null)
             {
-                // We are looking at a battery (or door, etc)!
+                // We ARE looking at an interactable object (like the battery)!
                 currentInteractable = interactableObject;
                 
+                // Change crosshair color
                 if (crosshair != null) 
-                    crosshair.color = interactColor; // Turn crosshair green
+                    crosshair.color = interactColor; 
+                
+                // Show the "Press E" text
+                if (interactText != null) 
+                    interactText.SetActive(true); 
                     
-                return; // Stop running the code below
+                return; // Stop running the rest of the code in this method
             }
         }
 
-        // If we get here, it means we AREN'T looking at anything interactable
+        // If we get down here, it means we are NOT looking at anything interactable
         currentInteractable = null;
         
+        // Reset crosshair to normal color
         if (crosshair != null) 
-            crosshair.color = normalColor; // Keep crosshair white
+            crosshair.color = normalColor; 
+            
+        // Hide the "Press E" text
+        if (interactText != null) 
+            interactText.SetActive(false); 
     }
 }
