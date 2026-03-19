@@ -4,6 +4,7 @@ public class EntityAI : MonoBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 2f;
+    [SerializeField] private float turnSpeed = 5f; // NEW: Controls how fast it rotates!
 
     [Header("Wander Borders (X and Z axis)")]
     [SerializeField] private float minX = -10f;
@@ -54,18 +55,28 @@ public class EntityAI : MonoBehaviour
         // 3. If we are tracking the player, constantly update the target to the player's position
         if (isTrackingPlayer && player != null)
         {
-            // Keep the entity's Y position so it doesn't float up or sink down to the player's camera level
             targetPosition = new Vector3(player.position.x, transform.position.y, player.position.z);
         }
 
         // 4. Move the entity
         transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
 
-        // 5. Look at the target (Only rotate if we are actually moving, to prevent glitchy snapping)
+        // 5. Look at the target (Smooth Rotation!)
         if (Vector3.Distance(transform.position, targetPosition) > 0.05f)
         {
-            Vector3 lookDirection = new Vector3(targetPosition.x, transform.position.y, targetPosition.z);
-            transform.LookAt(lookDirection);
+            // Figure out the direction to the target
+            Vector3 directionToTarget = targetPosition - transform.position;
+            directionToTarget.y = 0; // Keep the rotation perfectly flat on the ground
+
+            // Prevent a math error if the monster is standing directly on top of the target
+            if (directionToTarget != Vector3.zero) 
+            {
+                // Calculate what the final rotation should be
+                Quaternion targetRotation = Quaternion.LookRotation(directionToTarget);
+                
+                // Smoothly blend the current rotation to the target rotation
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
+            }
         }
 
         // 6. If we are just wandering and reach the random spot, pick a new one
